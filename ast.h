@@ -3,11 +3,34 @@
 
 #include <string>
 #include <vector>
+#include <map>
+
+//#include "llvm/ADT/APFloat.h"
+//#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/BasicBlock.h"
+//#include "llvm/IR/Constants.h"
+//#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+//#include "llvm/IR/IRBuilder.h"
+//#include "llvm/IR/LLVMContext.h"
+//#include "llvm/IR/Module.h"
+//#include "llvm/IR/Type.h"
+//#include "llvm/IR/Verifier.h"
+//#include <algorithm>
+//#include <cctype>
+//#include <cstdio>
+//#include <cstdlib>
+//#include <map>
+//#include <memory>
+//#include <string>
+//#include <vector>
+
 
 /// ExprAST - Base class for all expression nodes.
 class ExprAST {
 public:
     virtual ~ExprAST() {}
+    virtual llvm::Value *codegen() = 0;
 };
 
 /// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -16,6 +39,7 @@ class NumberExprAST : public ExprAST {
 
 public:
     NumberExprAST(double Val) : Val(Val) {}
+    virtual llvm::Value *codegen();
 };
 
 /// VariableExprAST - Expression class for referencing a variable, like "a".
@@ -24,12 +48,14 @@ class VariableExprAST : public ExprAST {
 
 public:
     VariableExprAST(const std::string &Name) : Name(Name) {}
+    virtual llvm::Value *codegen();
 };
 
 /// BinaryExprAST - Expression class for a binary operator.
 class BinaryExprAST : public ExprAST {
     char Op;
     std::unique_ptr<ExprAST> LHS, RHS;
+    virtual llvm::Value *codegen();
 
 public:
     BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS,
@@ -46,6 +72,7 @@ public:
     CallExprAST(const std::string &Callee,
                 std::vector<std::unique_ptr<ExprAST>> Args)
             : Callee(Callee), Args(std::move(Args)) {}
+    virtual llvm::Value *codegen();
 };
 
 /// PrototypeAST - This class represents the "prototype" for a function,
@@ -60,6 +87,8 @@ public:
             : Name(name), Args(std::move(Args)) {}
 
     const std::string &getName() const { return Name; }
+
+    llvm::Function *codegen();
 };
 
 /// FunctionAST - This class represents a function definition itself.
@@ -71,6 +100,8 @@ public:
     FunctionAST(std::unique_ptr<PrototypeAST> Proto,
                 std::unique_ptr<ExprAST> Body)
             : Proto(std::move(Proto)), Body(std::move(Body)) {}
+
+    llvm::Function *codegen();
 };
 
 #endif //KALEIDOSCOPE_AST_H

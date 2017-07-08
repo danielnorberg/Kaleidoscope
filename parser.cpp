@@ -1,6 +1,7 @@
 #include <llvm/ADT/STLExtras.h>
 #include <map>
 #include <iostream>
+#include <llvm/Support/raw_ostream.h>
 #include "lexer.h"
 #include "ast.h"
 
@@ -9,11 +10,12 @@ static int getNextToken() {
     return CurTok = gettok();
 }
 
-std::unique_ptr<ExprAST> LogError(const char *Str) {
+static std::unique_ptr<ExprAST> LogError(const char *Str) {
     fprintf(stderr, "LogError: %s\n", Str);
     return nullptr;
 }
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+
+static std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
     LogError(Str);
     return nullptr;
 }
@@ -214,24 +216,36 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 }
 
 static void HandleDefinition() {
-    if (auto E = ParseDefinition()) {
-        std::cout << "Parsed a function definition" << std::endl;
+    if (auto ast = ParseDefinition()) {
+        if (auto *ir = ast->codegen()) {
+            std::cerr << "Read function definition:";
+            ir->print(llvm::errs());
+            std::cerr << std::endl;
+        }
     } else {
         getNextToken();
     }
 }
 
 static void HandleExtern() {
-    if (auto E = ParseExtern()) {
-        std::cout << "Parsed an extern" << std::endl;
+    if (auto ast = ParseExtern()) {
+        if (auto *ir = ast->codegen()) {
+            std::cerr << "Read extern:";
+            ir->print(llvm::errs());
+            std::cerr << std::endl;
+        }
     } else {
         getNextToken();
     }
 }
 
 static void HandleTopLevelExpression() {
-    if (auto E = ParseTopLevelExpr()) {
-        std::cout << "Parsed a top level expression" << std::endl;
+    if (auto ast = ParseTopLevelExpr()) {
+        if (auto *ir = ast->codegen()) {
+            std::cerr << "Read top-level expression:";
+            ir->print(llvm::errs());
+            std::cerr << std::endl;
+        }
     } else {
         getNextToken();
     }
