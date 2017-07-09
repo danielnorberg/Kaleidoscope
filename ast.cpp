@@ -89,20 +89,24 @@ Function *PrototypeAST::codegen() {
 }
 
 Function *FunctionAST::codegen() {
-    // First, check for an existing function from a previous 'extern' declaration.
-    Function *TheFunction = TheModule->getFunction(Proto->getName());
-
-    if (!TheFunction)
-        TheFunction = Proto->codegen();
+    Function *TheFunction = Proto->codegen();
 
     if (!TheFunction)
         return nullptr;
 
-    if (!TheFunction->empty())
-        return (Function *) LogErrorV("Function cannot be redefined.");
+    Function *ExistingFunction = TheModule->getFunction(Proto->getName());
+
+    if (ExistingFunction) {
+        if (!ExistingFunction->empty())
+            return (Function *) LogErrorV("Function cannot be redefined.");
+
+        // Validate that definition arguments match previous 'extern' declaration.
+        if (ExistingFunction->arg_size() != TheFunction->arg_size())
+            return (Function *) LogErrorV("Function definition and extern declaration argument mismatch.");
+    }
 
     // Create a new basic block to start insertion into.
-    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
+    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);e
     Builder.SetInsertPoint(BB);
 
     // Record the function arguments in the NamedValues map.
