@@ -38,7 +38,7 @@ int gettok() {
     if (LastChar == '#') {
         do {
             LastChar = getchar();
-        } while(LastChar != EOF && LastChar != '\n' && LastChar != '\r');
+        } while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
 
         if (LastChar != EOF)
             return gettok();

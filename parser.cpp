@@ -6,6 +6,7 @@
 #include "ast.h"
 
 static int CurTok;
+
 static int getNextToken() {
     return CurTok = gettok();
 }
@@ -97,11 +98,11 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
 
 /// BinopPrecedence - This holds the precedence for each binary operator that is
 /// defined.
-static std::map<char, int> BinopPrecedence {
-    { '<', 10 },
-    { '+', 20 },
-    { '-', 20 },
-    { '*', 40 },
+static std::map<char, int> BinopPrecedence{
+        {'<', 10},
+        {'+', 20},
+        {'-', 20},
+        {'*', 40},
 };
 
 /// GetTokPrecedence - Get the precedence of the pending binary operator token.
@@ -141,7 +142,7 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
         // the pending operator take RHS as its LHS.
         int NextPrec = GetTokPrecedence();
         if (TokPrec < NextPrec) {
-            RHS = ParseBinOpRHS(TokPrec+1, std::move(RHS));
+            RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
             if (!RHS)
                 return nullptr;
         }

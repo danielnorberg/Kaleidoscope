@@ -30,6 +30,7 @@
 class ExprAST {
 public:
     virtual ~ExprAST() {}
+
     virtual llvm::Value *codegen() = 0;
 };
 
@@ -39,6 +40,7 @@ class NumberExprAST : public ExprAST {
 
 public:
     NumberExprAST(double Val) : Val(Val) {}
+
     virtual llvm::Value *codegen();
 };
 
@@ -48,6 +50,7 @@ class VariableExprAST : public ExprAST {
 
 public:
     VariableExprAST(const std::string &Name) : Name(Name) {}
+
     virtual llvm::Value *codegen();
 };
 
@@ -55,6 +58,7 @@ public:
 class BinaryExprAST : public ExprAST {
     char Op;
     std::unique_ptr<ExprAST> LHS, RHS;
+
     virtual llvm::Value *codegen();
 
 public:
@@ -72,6 +76,7 @@ public:
     CallExprAST(const std::string &Callee,
                 std::vector<std::unique_ptr<ExprAST>> Args)
             : Callee(Callee), Args(std::move(Args)) {}
+
     virtual llvm::Value *codegen();
 };
 
