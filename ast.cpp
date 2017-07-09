@@ -106,7 +106,7 @@ Function *FunctionAST::codegen() {
     }
 
     // Create a new basic block to start insertion into.
-    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);e
+    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
     Builder.SetInsertPoint(BB);
 
     // Record the function arguments in the NamedValues map.
