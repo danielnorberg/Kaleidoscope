@@ -2,7 +2,6 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/LinkAllPasses.h"
 
@@ -10,9 +9,12 @@
 
 using namespace llvm;
 
+std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
+std::unique_ptr<Module> TheModule;
+std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
-static std::unique_ptr<Module> TheModule;
 static std::map<std::string, Value *> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 
@@ -56,9 +58,24 @@ Value *BinaryExprAST::codegen() {
     }
 }
 
+static Function *getFunction(std::string Name) {
+    // First, see if the function has already been added to the current module.
+    if (auto *F = TheModule->getFunction(Name))
+        return F;
+
+    // If not, check whether we can codegen the declaration from some existing
+    // prototype.
+    auto FI = FunctionProtos.find(Name);
+    if (FI != FunctionProtos.end())
+        return FI->second->codegen();
+
+    // If no existing prototype exists, return null.
+    return nullptr;
+}
+
 Value *CallExprAST::codegen() {
     // Look up the name in the global module table.
-    Function *CalleeF = TheModule->getFunction(Callee);
+    Function *CalleeF = getFunction(Callee);
     if (!CalleeF)
         return LogErrorV("Unknown function referenced");
 
@@ -92,21 +109,12 @@ Function *PrototypeAST::codegen() {
 }
 
 Function *FunctionAST::codegen() {
-    Function *TheFunction = Proto->codegen();
 
+    auto &P = *Proto;
+    FunctionProtos[Proto->getName()] = std::move(Proto);
+    Function *TheFunction = getFunction(P.getName());
     if (!TheFunction)
         return nullptr;
-
-    Function *ExistingFunction = TheModule->getFunction(Proto->getName());
-
-    if (ExistingFunction) {
-        if (!ExistingFunction->empty())
-            return (Function *) LogErrorV("Function cannot be redefined.");
-
-        // Validate that definition arguments match previous 'extern' declaration.
-        if (ExistingFunction->arg_size() != TheFunction->arg_size())
-            return (Function *) LogErrorV("Function definition and extern declaration argument mismatch.");
-    }
 
     // Create a new basic block to start insertion into.
     BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
@@ -142,6 +150,7 @@ Function *FunctionAST::codegen() {
 void InitializeModuleAndPassManager() {
     // Open a new module.
     TheModule = llvm::make_unique<Module>("jit", TheContext);
+    TheModule->setDataLayout(TheJIT->getTargetMachine().createDataLayout());
 
     // Create a new pass manager attached to it.
     TheFPM = llvm::make_unique<legacy::FunctionPassManager>(TheModule.get());

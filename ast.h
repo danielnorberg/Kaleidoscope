@@ -7,7 +7,9 @@
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 
+#include "KaleidoscopeJIT.h"
 
 /// ExprAST - Base class for all expression nodes.
 class ExprAST {
@@ -90,7 +92,13 @@ public:
             : Proto(std::move(Proto)), Body(std::move(Body)) {}
 
     llvm::Function *codegen();
+
+    const std::string &getName() const { return Proto->getName(); }
 };
+
+extern std::unique_ptr<llvm::Module> TheModule;
+extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+extern std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
 
 void InitializeModuleAndPassManager();
 

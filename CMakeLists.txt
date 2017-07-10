@@ -11,7 +11,7 @@ find_path(LLVM_INCLUDE_DIR llvm)
 message("llvm lib: ${LLVM_LIBRARY}")
 message("llvm include: ${LLVM_INCLUDE_DIR}")
 
-set(SOURCE_FILES main.cpp lexer.cpp lexer.h ast.cpp ast.h parser.cpp parser.h)
+set(SOURCE_FILES main.cpp lexer.cpp lexer.h ast.cpp ast.h parser.cpp parser.h KaleidoscopeJIT.h)
 add_executable(Kaleidoscope ${SOURCE_FILES})
 target_link_libraries(Kaleidoscope ${LLVM_LIBRARY})
 include_directories(${LLVM_INCLUDE_DIR})

@@ -5,6 +5,8 @@
 #include "lexer.h"
 #include "ast.h"
 
+static std::map<std::string, llvm::orc::KaleidoscopeJIT::ModuleSetHandleT> FunctionModules;
+
 static int CurTok;
 
 static int getNextToken() {
@@ -210,7 +212,7 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
     if (auto E = ParseExpression()) {
         // Make an anonymous proto.
-        auto Proto = llvm::make_unique<PrototypeAST>("", std::vector<std::string>());
+        auto Proto = llvm::make_unique<PrototypeAST>("__anon_expr", std::vector<std::string>());
         return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
     }
     return nullptr;
@@ -218,10 +220,22 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 
 static void HandleDefinition() {
     if (auto ast = ParseDefinition()) {
+        auto &name = ast->getName();
+
         if (auto *ir = ast->codegen()) {
-            std::cerr << "Read function definition:";
+
+            // Remove previous definition, if any
+            auto i = FunctionModules.find(name);
+            if (i != FunctionModules.end()) {
+                TheJIT->removeModule(i->second);
+                FunctionModules.erase(i);
+            }
+
+            fprintf(stderr, "Read function definition:");
             ir->print(llvm::errs());
-            std::cerr << std::endl;
+            fprintf(stderr, "\n");
+            FunctionModules[name] = TheJIT->addModule(std::move(TheModule));
+            InitializeModuleAndPassManager();
         }
     } else {
         getNextToken();
@@ -231,9 +245,10 @@ static void HandleDefinition() {
 static void HandleExtern() {
     if (auto ast = ParseExtern()) {
         if (auto *ir = ast->codegen()) {
-            std::cerr << "Read extern:";
+            fprintf(stderr, "Read extern: ");
             ir->print(llvm::errs());
-            std::cerr << std::endl;
+            fprintf(stderr, "\n");
+            FunctionProtos[ast->getName()] = std::move(ast);
         }
     } else {
         getNextToken();
@@ -243,9 +258,26 @@ static void HandleExtern() {
 static void HandleTopLevelExpression() {
     if (auto ast = ParseTopLevelExpr()) {
         if (auto *ir = ast->codegen()) {
-            std::cerr << "Read top-level expression:";
+
+            std::cerr << "Read top-level expr:";
             ir->print(llvm::errs());
-            std::cerr << std::endl;
+
+            // JIT the module containing the anonymous expression, keeping a handle so
+            // we can free it later.
+            auto H = TheJIT->addModule(std::move(TheModule));
+            InitializeModuleAndPassManager();
+
+            // Search the JIT for the __anon_expr symbol.
+            auto ExprSymbol = TheJIT->findSymbol("__anon_expr");
+            assert(ExprSymbol && "Function not found");
+
+            // Get the symbol's address and cast it to the right type (takes no
+            // arguments, returns a double) so we can call it as a native function.
+            double (*FP)() = (double (*)()) (intptr_t) ExprSymbol.getAddress();
+            fprintf(stderr, "Evaluated to %f\n", FP());
+
+            // Delete the anonymous expression module from the JIT.
+            TheJIT->removeModule(H);
         }
     } else {
         getNextToken();
