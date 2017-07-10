@@ -1,8 +1,10 @@
 #include <iostream>
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/LinkAllPasses.h"
 
 #include "ast.h"
 
@@ -10,8 +12,9 @@ using namespace llvm;
 
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
-static std::unique_ptr<Module> TheModule = llvm::make_unique<Module>("jit", TheContext);
+static std::unique_ptr<Module> TheModule;
 static std::map<std::string, Value *> NamedValues;
+static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 
 Value *LogErrorV(const char *Str) {
     fprintf(stderr, "LogError: %s\n", Str);
@@ -125,10 +128,32 @@ Function *FunctionAST::codegen() {
             return nullptr;
         }
 
+        // Optimize the function.
+        TheFPM->run(*TheFunction);
+
         return TheFunction;
     }
 
     // Error reading body, remove function.
     TheFunction->eraseFromParent();
     return nullptr;
+}
+
+void InitializeModuleAndPassManager() {
+    // Open a new module.
+    TheModule = llvm::make_unique<Module>("jit", TheContext);
+
+    // Create a new pass manager attached to it.
+    TheFPM = llvm::make_unique<legacy::FunctionPassManager>(TheModule.get());
+
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    TheFPM->add(createInstructionCombiningPass());
+    // Reassociate expressions.
+    TheFPM->add(createReassociatePass());
+    // Eliminate Common SubExpressions.
+    TheFPM->add(createGVNPass());
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    TheFPM->add(createCFGSimplificationPass());
+
+    TheFPM->doInitialization();
 }

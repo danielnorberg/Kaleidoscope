@@ -92,4 +92,6 @@ public:
     llvm::Function *codegen();
 };
 
+void InitializeModuleAndPassManager();
+
 #endif //KALEIDOSCOPE_AST_H
